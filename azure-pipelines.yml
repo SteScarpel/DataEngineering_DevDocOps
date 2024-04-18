@@ -1,0 +1,53 @@
+trigger:
+- master
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- bash: | 
+    if [ -f extensions.csproj ]
+    then
+      dotnet build extensions.csproj --output ./bin
+    fi
+  displayName: 'Build extensions'
+- task: UsePythonVersion@0
+  displayName: 'Use Python 3.9'
+  inputs:
+    versionSpec: '3.9'
+    addToPath: true
+    architecture: 'x64'
+- bash: |
+    pip3.9 install -r requirements.txt
+  displayName: 'Install Application Dependencies'
+
+- bash: |
+    python generate_data_dictionary.py
+  displayName: 'Run Script Documentation'
+
+- task: CopyFiles@2
+  inputs:
+    SourceFolder: '$(Build.SourcesDirectory)'
+    Contents: '*.md'
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'drop'
+    publishLocation: 'Container'
+
+- task: WikiUpdaterTask@2
+  inputs:
+    repo: 'dev.azure.com/devdocumentation-ops/Dev%20Documentation%20Ops%20-%20Mestrado/_git/Documentation'
+    filename: 'ReleaseNotes/$(Build.BuildNumber).md'
+    replaceFile: true
+    dataIsFile: true
+    sourceFile: '$(Build.SourcesDirectory)/DOCUMENTACAO_TESTE.md'
+    message: 'Auto-Generated Release Notes'
+    gitname: '$(Build.RequestedFor)'
+    gitemail: '$(Build.RequestedForEmail)'
+    useAgentToken: false
+    user: 'devdocumentation-ops'
+    password: '$(PAT)'
+    localpath: '$(System.DefaultWorkingDirectory)/repo'
+    injectExtraHeader: false
